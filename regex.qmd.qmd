@@ -1,0 +1,158 @@
+---
+title: "Regular Expressions"
+format:
+  html:
+    code-fold: true
+jupyter: python3
+---
+
+## Symbols
+
+- `.`: Any character
+- `^`: At the start of a string
+- `$`: At the end of a string
+- `[]`: Contains a set
+- `[^]`: Set negotiation
+- `|`: Or
+- `()`: Grouping
+- `*`: 0 or more
+- `+`: 1 or more
+- `?`: 0 or 1
+- `{n}`: Exaclty n times
+- `{n,}`: N or more times
+- `{n,m}`: N to m times
+- `\`: escape character
+- `\d`: digit
+- `\D`: not a digit
+- `\w`: word character
+- `\W`: Not a word character
+- `\s`: whitespace
+- `\S`: Not whitespace
+
+### Lookarounds
+
+- `(?=)`: Positive lookahead
+- `(?!)`: Negative lookahead
+- `(?<=)`: Positive lookbehind
+- `(?<!)`: Negative lookbehind
+
+
+## Functions
+
+### re
+
+```{python}
+#| eval: false
+import re
+
+string = '''
+Lil Baby helped you get your lingo up (What?)
+21 gave you false street cred
+Thug made you feel like you a slime in your head (Ayy, what?)
+Quavo said you can be from Northside (What?)
+2 Chainz say you good, but he lied
+'''
+
+re.findall('\d+', string)
+
+re.sub(r'\d+', 'X', string)
+
+re.split(r'\d+', string)
+
+re.match(r'\d+', string)
+```
+
+#### On the use of r
+
+You will often see the letter `r` before the string in regular expressions. This is to denote a raw string. This is important because it tells Python to ignore any special characters in the string. For example, if you want to match a backslash, you would need to use `\\` in a regular string. However, in a raw string, you can use `\`. 
+
+### pandas
+
+```{python}
+import pandas as pd
+
+example_df = pd.DataFrame(
+    {'text': [string]}
+)
+
+example_df['text'].str.findall(r'\d+')
+
+example_df['text'].str.replace(r'\d+', 'X')
+
+example_df['text'].str.split(r'\d+')
+
+example_df['text'].str.match(r'\d+')
+
+example_df['text'].str.extract(r'(\d+)')
+
+example_df['text'].str.extractall(r'(\d+)')
+
+example_df['text'].str.contains(r'\d+')
+
+example_df['text'].str.count(r'\d+')
+```
+
+
+```{python}
+import pandas as pd
+import pyarrow as pa
+import re
+```
+
+```{python}
+test_strings = [
+    "Cant change the weatherMight not be forever",
+    "[Chorus] Say you can't sleep, baby, I know that's that me espresso [verse 1]",
+    " This 9 to 5 ain't  workin', why the hell do I work so hard? ",
+    "Where there's a will, then there's a way And I'm damn sure you lost it Embedded lyrics here", 
+    "https://www.billboard.com/charts/hot-100/2025-01-11/"
+]
+```
+
+```{python}
+lyrics_df = pd.DataFrame({"lyrics": test_strings}
+)
+
+lyrics_df['lyrics']
+```
+
+## Examples
+
+### Removing Specific Words
+
+```{python}
+lyrics_df['lyrics'].str.replace(r'Embedded.*$','', regex=True)[3]
+```
+
+### Removing Extra Space
+
+```{python}
+lyrics_df['lyrics'].str.replace(r'^\s|s$', '', regex=True)[2]
+```
+
+### Removing Bracketed Text
+
+```{python}
+lyrics_df['lyrics'].str.replace(r'\[.*?\]', '', regex=True)[1]
+```
+
+### Splitting Text
+
+```{python}
+lyrics_df['lyrics'].str.replace('([a-z])([A-Z])', '\\1 \\2', regex=True)[0]
+```
+
+### Extracting Text
+https://www.billboard.com/charts/hot-100/2025-01-11/
+```{python}
+re.search('(?<=chaqrts/).*(?=/\d{4})', lyrics_df['lyrics'][4]).group(0)
+```
+
+## More Work
+
+```{python}
+all_lyrics = pd.read_feather(
+    '/Users/sberry5/Documents/teaching/UDA/code/lyrics_scrape_python/complete_lyrics_2025.feather', 
+    dtype_backend='pyarrow'
+)
+```
