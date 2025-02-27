@@ -46,8 +46,8 @@ def predict_image(image):
     return CATEGORIES[class_index], confidence
 
 # Making the app
-st.title("📷 Image Selection Classifier")
-st.write("Upload an image and the model will classify it as **selected** or **not_selected**.")
+st.title("📷 Photo of The Year?")
+st.write("Upload an image and the model will classify it as **selected** or **not selected** for a photo of the year catalog. This model was tranied off images from CNN, AP, and TIME. Will your image make the cut?")
 
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
 
