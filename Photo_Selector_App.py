@@ -74,18 +74,12 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ✅ Structured Layout
-col1, col2 = st.columns([1, 2])
-
-with col1:
-    st.image("/Users/mattgutierrez80/Desktop/UDA_Notes/test_image.jpg", width=100)  
-
-with col2:
-    st.title("📷 Photo of The Year?")
-    st.write(
-        "Upload an image and the model will classify it as **selected** or **not selected** for a "
-        "photo of the year catalog. This model was trained on images from CNN, AP, and TIME."
-    )
+# ✅ Simple Layout (No Extra Columns)
+st.title("📷 Photo of The Year?")
+st.write(
+    "Upload an image and the model will classify it as **selected** or **not selected** for a "
+    "photo of the year catalog. This model was trained on images from CNN, AP, and TIME."
+)
 
 # ✅ File Upload
 uploaded_file = st.file_uploader("📂 Upload an Image", type=["jpg", "png", "jpeg"])
