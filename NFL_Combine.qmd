@@ -1,0 +1,153 @@
+---
+title: "Untitled"
+format: html
+---
+NFL Combine Data From 2000-2018
+```{python}
+import pandas as pd
+
+file_path = "/Users/mattgutierrez80/Downloads/NFL_Combine_Data.csv"
+
+nfl_combine_data = pd.read_csv(file_path)
+
+print(nfl_combine_data.head())
+
+```
+
+Averages by Year and Position
+```{python}
+
+average_stats_per_pos = nfl_combine_data.groupby(['Year', 'Pos']).mean(numeric_only=True)
+
+average_stats_per_pos = average_stats_per_pos.reset_index()
+
+print(average_stats_per_pos.head())
+
+print(average_stats_per_pos.tail())
+
+average_stats_per_year.to_csv('/Users/mattgutierrez80/Downloads/average_stats_per_pos.csv', index=False)
+
+```
+
+40-Yard Dash Times Over the Years
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+plt.figure(figsize=(10, 5))
+sns.lineplot(data=average_stats_per_pos, x='Year', y='Forty', marker='o', ci=None)
+
+plt.xlabel("Year")
+plt.ylabel("Average 40-Yard Dash Time")
+plt.title("NFL Combine: Average 40-Yard Dash Time Over the Years")
+plt.grid(True)
+plt.show()
+
+```
+
+Bench Press Reps Over the Years
+```{python}
+plt.figure(figsize=(10, 5))
+sns.lineplot(data=average_stats_per_pos, x='Year', y='BenchReps', marker='o', ci=None)
+
+plt.xlabel("Year")
+plt.ylabel("Average Bench Press Reps")
+plt.title("NFL Combine: Average Bench Press Reps Over the Years")
+plt.grid(True)
+plt.show()
+
+
+```
+
+Vertical Jump Over the Years
+```{python}
+plt.figure(figsize=(10, 5))
+sns.lineplot(data=average_stats_per_pos, x='Year', y='Vertical', marker='o', ci=None)
+
+plt.xlabel("Year")
+plt.ylabel("Vertical Jump (inches)")
+plt.title("NFL Combine: Average Vertical Jump Over the Years")
+plt.grid(True)
+plt.show()
+```
+
+Broad Jump Over the Years
+```{python}
+plt.figure(figsize=(10, 5))
+sns.lineplot(data=average_stats_per_pos, x='Year', y='BroadJump', marker='o', ci=None)
+
+plt.xlabel("Year")
+plt.ylabel("Broad Jump (inches)")
+plt.title("NFL Combine: Average Broad Jump Over the Years")
+plt.grid(True)
+plt.show()
+```
+
+Cone Drill Times Over the Years
+```{python}
+plt.figure(figsize=(10, 5))
+sns.lineplot(data=average_stats_per_pos, x='Year', y='Cone', marker='o', ci=None)
+
+plt.xlabel("Year")
+plt.ylabel("Cone Drill Time (seconds)")
+plt.title("NFL Combine: Average Cone Drill Time Over the Years")
+plt.grid(True)
+plt.show()
+```
+
+Shuttle Drill Times Over the Years
+```{python}
+plt.figure(figsize=(10, 5))
+sns.lineplot(data=average_stats_per_pos, x='Year', y='Shuttle', marker='o', ci=None)
+
+plt.xlabel("Year")
+plt.ylabel("Shuttle Drill Time (seconds)")
+plt.title("NFL Combine: Average Shuttle Drill Time Over the Years")
+plt.grid(True)
+plt.show()
+```
+
+Weight Over the Years
+```{python}
+plt.figure(figsize=(10, 5))
+sns.lineplot(data=average_stats_per_pos, x='Year', y='Wt', marker='o', ci=None)
+
+plt.xlabel("Year")
+plt.ylabel("Weight (lbs)")
+plt.title("NFL Combine: Average Weight Over the Years")
+plt.grid(True)
+plt.show()
+```
+
+Height Over the Years
+```{python}
+plt.figure(figsize=(10, 5))
+sns.lineplot(data=average_stats_per_pos, x='Year', y='Ht', marker='o', ci=None)
+
+plt.xlabel("Year")
+plt.ylabel("Height (inches)")
+plt.title("NFL Combine: Average Height Over the Years")
+plt.grid(True)
+plt.show()
+
+```
+
+
+Averages by Year
+```{python}
+import pandas as pd
+
+file_path = "/Users/mattgutierrez80/Downloads/NFL_Combine_Data.csv"
+df = pd.read_csv(file_path)
+
+average_stats_per_year = df.groupby('Year').mean(numeric_only=True).reset_index()
+
+print(average_stats_per_year.head())
+
+output_path = "/Users/mattgutierrez80/Downloads/average_stats_per_year.csv"
+average_stats_per_year.to_csv(output_path, index=False)
+print(f"File saved successfully at: {output_path}")
+
+```
+
+

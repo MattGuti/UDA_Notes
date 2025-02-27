@@ -1,0 +1,473 @@
+---
+title: "Photos of the Year: An Image Selection Model"
+author: "Matthew Gutierrez"
+format: html
+---
+
+## Introduction
+
+I've always been interested in how image selection works for top media outlets like CNN, AP, and TIME. Specifically, I wanted to explore what makes an image more likely to be chosen for publication. By analyzing a dataset of images that were selected versus not selected, I aimed to identify key patterns that influence selection.
+
+### Primary Questions
+
+1. What distinguishes selected images from not_selected images?
+
+2. Can a machine learning model predict whether an image will be selected based on its attributes?
+
+
+## Data
+
+The dataset consists of 573 images, split into selected and not_selected categories. The images were preprocessed (resized and normalized) before being used to train a CNN model in Keras. Below is the code used to load and preprocess the data for analysis:
+
+
+# Scraping Selected Images
+
+Here the code is scraping the images from CNN, TIME, and AP for what would go into my "selected" phtoto category.
+
+```{python}
+import os
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+import shutil
+import numpy as np
+
+# Saving the Images
+IMAGE_DIR = "/Users/mattgutierrez80/Desktop/UDA_Notes/images/selected"
+if not os.path.exists(IMAGE_DIR):
+    os.makedirs(IMAGE_DIR)
+
+# Target Websites
+websites = {
+    "cnn": "https://www.cnn.com/interactive/2024/specials/year-in-pictures/",
+    "ap": "https://apnews.com/associated-press-100-photos-of-2024-an-epic-catalog-of-humanity",
+    "time": "https://time.com/7176286/top-100-photos-2024/"
+    }
+
+def download_image(img_url, folder, img_name):
+    response = requests.get(img_url, stream=True)
+    if response.status_code == 200:
+        img_path = os.path.join(folder, img_name)
+        with open(img_path, 'wb') as file:
+            shutil.copyfileobj(response.raw, file)
+        print(f"Downloaded: {img_name}")
+    else:
+        print(f"Failed to download: {img_url}")
+
+# Function to scrape images from a website
+def scrape_images(site_name, url):
+    print(f"Scraping images from {site_name}...")
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    img_tags = soup.find_all('img')
+    img_urls = [urljoin(url, img['src']) for img in img_tags if 'src' in img.attrs]
+
+    for i, img_url in enumerate(img_urls):
+        download_image(img_url, IMAGE_DIR, f"{site_name}_{i}.jpg")
+
+# Scraping websites
+for site, link in websites.items():
+    np.random.uniform(.1, .25, 1)
+    scrape_images(site, link)
+
+print("Image scraping completed!")
+```
+
+
+
+# Scraping not selected images
+
+For my not Selected images I chose to obtain photos from awkward family photos in order to have a set of photos that had not been selected by a commitee. One thing that was different for this scraping was the use of selenium. Awkward family photos usea Java execution so the normal scraping procedure did not work. Also there were many pages of photos to scropp through which selenium does well.
+
+```{python}
+import os
+import time
+import shutil
+import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
+
+# Saving the images
+IMAGE_DIR = "/Users/mattgutierrez80/Desktop/UDA_Notes/images/not_selected"
+if not os.path.exists(IMAGE_DIR):
+    os.makedirs(IMAGE_DIR)
+
+# Setting up a selenium webdriver
+options = webdriver.ChromeOptions()
+options.add_argument("--headless")  # Run Chrome in the background
+options.add_argument("--disable-gpu")
+options.add_argument("--window-size=1920x1080")
+
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+
+# Global counter to track total images downloaded
+downloaded_images = 0
+MAX_IMAGES = 500
+
+BASE_URL = "https://awkwardfamilyphotos.com/category/photos/random-awkwardness/page/{}/"
+
+def download_image(img_url, folder, img_name):
+    """Download an image from a given URL."""
+    global downloaded_images
+    if downloaded_images >= MAX_IMAGES:
+        print("🚀 Reached 500 images! Stopping scraper.")
+        return False  
+
+    try:
+        response = requests.get(img_url, stream=True, timeout=10)
+        if response.status_code == 200:
+            img_path = os.path.join(folder, img_name)
+            with open(img_path, 'wb') as file:
+                shutil.copyfileobj(response.raw, file)
+            downloaded_images += 1
+            print(f"Downloaded ({downloaded_images}/{MAX_IMAGES}): {img_name}")
+            return True
+        else:
+            print(f"Failed to download: {img_url}")
+    except Exception as e:
+        print(f"Error downloading {img_url}: {e}")
+    return False
+
+def scrape_pages():
+    """Scrape images from Awkward Family Photos across multiple pages."""
+    global downloaded_images
+    page_number = 1  
+
+    while downloaded_images < MAX_IMAGES:
+        url = BASE_URL.format(page_number)
+        print(f"Scraping Page {page_number}: {url}")
+
+        driver.get(url)
+        time.sleep(5)  
+
+        img_elements = driver.find_elements(By.TAG_NAME, "img")
+        img_urls = []
+
+        for img in img_elements:
+            src = img.get_attribute("data-src") or img.get_attribute("src")
+            if src and "awkwardfamilyphotos" in src:  
+                img_urls.append(src)
+
+        if not img_urls:
+            print(f"No more images found on Page {page_number}. Stopping.")
+            break  
+
+        print(f" Found {len(img_urls)} images on Page {page_number}.")
+
+        for img_url in img_urls:
+            if downloaded_images >= MAX_IMAGES:
+                break
+            download_image(img_url, IMAGE_DIR, f"awkward_{downloaded_images}.jpg")
+
+        page_number += 1  
+
+# Running the scraper
+scrape_pages()
+
+# Closing the browser
+driver.quit()
+
+print("Image scraping completed! 500 images saved in:", IMAGE_DIR)
+
+
+```
+
+
+# Checking the sizes of the Images
+
+Checking the sizes of the images was crucial in the resizing process to see how many photos needed to be resized.
+```{python}
+import os
+import cv2
+
+DATASET_PATH = "/Users/mattgutierrez80/Desktop/UDA_Notes/images"
+
+def check_image_sizes():
+    sizes = {}
+    for folder in os.listdir(DATASET_PATH):
+        folder_path = os.path.join(DATASET_PATH, folder)
+        if not os.path.isdir(folder_path):
+            continue
+
+        for img_name in os.listdir(folder_path):
+            img_path = os.path.join(folder_path, img_name)
+            img = cv2.imread(img_path)
+
+            if img is None:
+                print(f"Skipping {img_path}, invalid image")
+                continue
+
+            height, width, _ = img.shape
+            size_key = f"{width}x{height}"
+            sizes[size_key] = sizes.get(size_key, 0) + 1
+
+    print("Image Size Distribution:", sizes)
+
+# Running script
+check_image_sizes()
+
+```
+
+# Resizing Images
+
+This is the code I used to resize the images to a uniform size. This makes for better implementation and reading inside my model. The images were saved in a new "resized_images" folder but still under seleted or not selected.
+```{python}
+import os
+import cv2
+
+# Paths
+ORIGINAL_PATH = "/Users/mattgutierrez80/Desktop/UDA_Notes/images"
+NEW_PATH = "/Users/mattgutierrez80/Desktop/UDA_Notes/resized_images"
+IMG_SIZE = (224, 224)  # Standardized image size
+
+# Create a new directory for resized images
+if not os.path.exists(NEW_PATH):
+    os.makedirs(NEW_PATH)
+
+# Loop through 'selected' and 'not_selected' folders
+for category in ["selected", "not_selected"]:
+    folder_path = os.path.join(ORIGINAL_PATH, category)
+    new_folder_path = os.path.join(NEW_PATH, category)
+
+    if not os.path.isdir(folder_path):
+        print(f"⚠️ Skipping {folder_path}, folder not found")
+        continue
+
+    # Create the resized folder if it does not exist
+    if not os.path.exists(new_folder_path):
+        os.makedirs(new_folder_path)
+
+    # Resize each image
+    for img_name in os.listdir(folder_path):
+        img_path = os.path.join(folder_path, img_name)
+        new_img_path = os.path.join(new_folder_path, img_name)
+
+        img = cv2.imread(img_path)
+        if img is None:
+            print(f"Skipping {img_path}, invalid image")
+            continue
+
+        img = cv2.resize(img, IMG_SIZE)
+        cv2.imwrite(new_img_path, img)
+
+print("All images resized and saved in:", NEW_PATH)
+
+```
+
+# Creating and training the model
+
+In this code chunk, I created an image selection model using a CNN (Convolutional Neural Network) with Keras. I included a pretrained MobileNetV2 base for feature extraction and added custom fully connected layers to adapt the model to my dataset. The MobileNetV2 was necesarry as I did not have a ton of photos so it definitely helped to make the model more accurate.
+```{python}
+import os
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers, applications
+import cv2
+from sklearn.model_selection import train_test_split
+import hashlib
+import matplotlib.pyplot as plt
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+# Defined dataset path
+DATASET_PATH = "/Users/mattgutierrez80/Desktop/UDA_Notes/resized_images"
+
+# Defined constants
+IMG_SIZE = (224, 224)
+BATCH_SIZE = 32
+CATEGORIES = ["not_selected", "selected"]
+
+# Function to load and preprocess images
+def load_images():
+    data, labels, hashes = [], [], set()
+    for category in CATEGORIES:
+        class_index = CATEGORIES.index(category)
+        category_path = os.path.join(DATASET_PATH, category)
+
+        if not os.path.exists(category_path):
+            continue
+
+        for img_name in os.listdir(category_path):
+            img_path = os.path.join(category_path, img_name)
+            img = cv2.imread(img_path)
+            if img is None:
+                continue
+            img = cv2.resize(img, IMG_SIZE)
+
+            # ✅ Remove duplicates
+            img_hash = hashlib.md5(img.tobytes()).hexdigest()
+            if img_hash in hashes:
+                continue
+
+            hashes.add(img_hash)
+            data.append(img)
+            labels.append(class_index)
+
+    return np.array(data), np.array(labels)
+
+# Loading dataset and normalize
+X, y = load_images()
+X = X / 255.0  # Normalize images (0-255 → 0-1)
+
+# Train-Test Split (60% train, 20% validation, 20% test)
+X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.4, random_state=42)
+X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
+
+print(f"Training images: {len(X_train)}")
+print(f"Validation images: {len(X_val)}")
+print(f"Test images: {len(X_test)}")
+
+# Data Augmentation
+datagen = ImageDataGenerator(rotation_range=40, width_shift_range=0.2,
+                             height_shift_range=0.2, zoom_range=0.2,
+                             horizontal_flip=True, fill_mode='nearest')
+datagen.fit(X_train)
+
+# Optimized Model with MobileNetV2 (Transfer Learning)
+def create_model():
+    base_model = applications.MobileNetV2(input_shape=(224, 224, 3), include_top=False, weights="imagenet")
+    base_model.trainable = False  # Freeze base layers
+
+    model = keras.Sequential([
+        base_model,
+        layers.GlobalAveragePooling2D(),
+        layers.Dense(128, activation='relu'),
+        layers.BatchNormalization(),
+        layers.Dropout(0.5),  # ✅ Reduced dropout
+        layers.Dense(len(CATEGORIES), activation='softmax')
+    ])
+
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    return model
+
+# Training the model
+print("🚀 Training model...")
+model = create_model()
+history = model.fit(datagen.flow(X_train, y_train, batch_size=32),
+                    validation_data=(X_val, y_val),
+                    epochs=25)  # ✅ Increased epochs
+
+# Saving the model
+model.save("/Users/mattgutierrez80/image_selection_model.keras")
+print("✅ Model saved as image_selection_model.keras")
+
+# Plotting the accuracy
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.legend()
+plt.show()
+```
+
+# Checking the prediction level
+
+I used the model and ran predictions on some test photos to check and see if the model was running efficiently. This is where I ran into most of my problems but ultimately tweaked y model enough for it to run efficiently.
+```{python}
+import tensorflow as tf
+import numpy as np
+import cv2
+import sys
+
+# Loading the trained model
+try:
+    model = tf.keras.models.load_model("image_selection_model.keras")
+    print("Model loaded successfully.")
+except Exception as e:
+    print(f" Error loading model: {e}")
+    sys.exit(1)
+model.summary()
+# Image size & class labels
+IMG_SIZE = (224, 224)
+CATEGORIES = ["not_selected", "selected"]
+
+def predict_image(image_path):
+    img = cv2.imread(image_path)
+    if img is None:
+        print(f"Error: Could not read image at {image_path}")
+        return
+
+    img = cv2.resize(img, IMG_SIZE)
+    img = img / 255.0
+    img = np.expand_dims(img, axis=0)
+
+    # Making prediction
+    prediction = model.predict(img)
+    class_index = np.argmax(prediction)
+    confidence = np.max(prediction)
+
+    print(f"🔍 Prediction: {CATEGORIES[class_index]} (Confidence: {confidence:.2f})")
+
+# Test with test image
+image_path = "/Users/mattgutierrez80/Desktop/funny4.jpeg"
+predict_image(image_path)
+```
+
+# Streamlit app generation
+
+I then used Streamlit to create a web app for my model for use of use to drop in pictures without the need for code. This was probably the coolest part of my project as I really felt that it had come together into something awesome that I had created.
+```{python}
+import streamlit as st  
+import tensorflow as tf
+import numpy as np
+import cv2
+from PIL import Image
+
+# Loading the model
+@st.cache_resource
+def load_model():
+    try:
+        model = tf.keras.models.load_model("/Users/mattgutierrez80/image_selection_model.keras")
+        return model
+    except Exception as e:
+        st.error(f" Error loading model: {e}")
+        return None
+
+model = load_model()
+
+
+IMG_SIZE = (224, 224)
+CATEGORIES = ["not_selected", "selected"]
+
+def predict_image(image):
+    """Preprocess image & predict category."""
+    img = np.array(image)
+    img = cv2.resize(img, IMG_SIZE)
+    img = img / 255.0  
+    img = np.expand_dims(img, axis=0)
+
+    prediction = model.predict(img)
+    class_index = np.argmax(prediction)
+    confidence = np.max(prediction)
+
+    return CATEGORIES[class_index], confidence
+
+# Making the app
+st.title("📷 Image Selection Classifier")
+st.write("Upload an image and the model will classify it as **selected** or **not_selected**.")
+
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
+
+if uploaded_file is not None:
+    # Displaying Uploaded Image
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
+
+    # Making the Prediction
+    if st.button("🔍 Predict"):
+        label, confidence = predict_image(image)
+        st.success(f"**Prediction:** {label} 🎯 (Confidence: {confidence:.2f})")
+
+```
+
+
+## Discussion
+ 
+Looking at the AI’s photo selections compared to what a human would pick, I was surprised by how often they lined up. I expected AI to struggle with the more subtle, artistic choices. While it did in fact stuggle at some points and is still not very accurate, it actually did a solid job.  
+
+I went into this thinking human judgment would be way better, but my model definitely held its own. That said, the differences reminded me why humans are still needed. AI can recognize patterns, but it doesn’t have intuition or a creative eye. It can’t fully understand why some images just feel right, which is something that we as humaans have mastered.  
+
+Overall, AI can be a helpful tool for narrowing down choices, but it’s not replacing human decision-making anytime soon. For photographers, editors, and content creators, it’s less about letting AI take over and more about using it to save time while keeping control over the final picks.
+
+This project really did test me and I am really glad to have had the opportunity to create something I find really awesome. The model I created was so much more than I could have ever thought and while it is no where near perfect, I am proud that I made this.
