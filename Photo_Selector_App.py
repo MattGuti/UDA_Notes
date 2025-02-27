@@ -5,15 +5,15 @@ import cv2
 import os
 import time
 from PIL import Image
-import streamlit.components.v1 as components
+from io import BytesIO
 
-# ✅ Get the absolute path of the current directory (Works in Streamlit!)
+# Getting the absolute path of the current directory
 BASE_DIR = os.path.abspath(os.path.dirname(__file__) if "__file__" in locals() else os.getcwd())
 
-# ✅ Construct the correct model path
+# Constructing the correct model path
 MODEL_PATH = os.path.join(BASE_DIR, "image_selection_model.keras")
 
-# ✅ Load the trained model with caching
+# Loading my trained model with caching
 @st.cache_resource
 def load_model():
     with st.spinner("🔄 Loading Model... Please Wait."):
@@ -26,7 +26,7 @@ def load_model():
 
 model = load_model()
 
-# ✅ Image size & class labels
+# Image size & class labels
 IMG_SIZE = (224, 224)
 CATEGORIES = ["not_selected", "selected"]
 
@@ -34,8 +34,8 @@ def predict_image(image):
     """Preprocess image & predict category."""
     img = np.array(image)
     img = cv2.resize(img, IMG_SIZE)
-    img = img / 255.0  # Normalize
-    img = np.expand_dims(img, axis=0)  # Add batch dimension
+    img = img / 255.0  
+    img = np.expand_dims(img, axis=0) 
 
     prediction = model.predict(img)
     class_index = np.argmax(prediction)
@@ -43,18 +43,23 @@ def predict_image(image):
 
     return CATEGORIES[class_index], confidence
 
-def play_sound():
-    """Play sound effect if selected."""
-    components.html(
-        """
-        <audio autoplay>
-        <source src="https://www.myinstants.com/media/sounds/tada-fanfare-a.mp3" type="audio/mpeg">
-        </audio>
-        """,
-        height=0,
-    )
+def play_sound(label):
+    """Play different sound effects based on selection result."""
+    selected_audio = "/Users/mattgutierrez80/Downloads/yippee.mp3"  
+    not_selected_audio = "/Users/mattgutierrez80/Downloads/fart.mp3"  
 
-# ✅ Custom CSS Styling
+    # Choose the correct audio file
+    audio_file = selected_audio if label == "selected" else not_selected_audio
+
+    if os.path.exists(audio_file):
+        with open(audio_file, "rb") as file:
+            audio_bytes = BytesIO(file.read()) 
+            st.audio(audio_bytes, format="audio/mp3")  
+            st.markdown("🔊 **Click play to hear the sound!**")
+    else:
+        st.error(f"⚠️ Sound file not found: {audio_file}")
+
+# Custom Styling
 st.markdown(
     """
     <style>
@@ -74,32 +79,35 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ✅ Simple Layout (No Extra Columns)
+# Layout
 st.title("📷 Photo of The Year?")
 st.write(
     "Upload an image and the model will classify it as **selected** or **not selected** for a "
-    "photo of the year catalog. This model was trained on images from CNN, AP, and TIME."
+    "photo of the year catalog. This model was trained on images from CNN, AP, and TIME. Will your image make the cut?"
 )
 
-# ✅ File Upload
+# File Upload
 uploaded_file = st.file_uploader("📂 Upload an Image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
-    # ✅ Display Uploaded Image
+    # Display Uploaded Image
     image = Image.open(uploaded_file)
-    st.image(image, caption="📷 Uploaded Image", use_container_width=True)
+    st.image(image, caption="📷 Uploaded Image", use_column_width=True)
 
-    # ✅ Make Prediction
+    # Make Prediction
     if st.button("🔍 Predict"):
         with st.spinner("Analyzing image... 🔍"):
-            time.sleep(2)  # Simulate loading effect
+            time.sleep(2) 
             label, confidence = predict_image(image)
 
-        # ✅ Display Result
+        # Display Result
         if label == "selected":
-            play_sound()
             st.balloons()
             st.success(f"🏆 **Your image made the cut!** 🎯 (Confidence: {confidence:.2f})")
+            play_sound(label) 
         else:
             st.warning(f"🚫 Not selected this time... Try another! ({confidence:.2f} confidence)")
+            play_sound(label) 
+
+
 

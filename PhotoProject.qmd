@@ -2,25 +2,30 @@
 title: "Photos of the Year: An Image Selection Model"
 author: "Matthew Gutierrez"
 format: html
+toc: true
+toc-location: left   # or 'right' or 'top'
+
 ---
 
-## Introduction
+# Introduction
 
-I've always been interested in how image selection works for top media outlets like CNN, AP, and TIME. Specifically, I wanted to explore what makes an image more likely to be chosen for publication. By analyzing a dataset of images that were selected versus not selected, I aimed to identify key patterns that influence selection.
+Photography has been around since 1826, when the first ever picture was taken in Germany. This started a hobby/profession that would allow us to document and explore the world around us through the lens of a camera. It allows people to express themselves both artistically and creatively. Getting your photo selected to be in a photo of the year catalog for  huge media outlet is huge accomplishment that many photographers strive to achive. 
 
-### Primary Questions
+I've always been interested in how the image selection process works for top media outlets like CNN, AP, and TIME. Specifically, I wanted to explore what makes an image more likely to be chosen for publication. By analyzing a dataset of images that were selected versus not selected, I aimed to identify key patterns that influence selection and build a model that can predict whether an image will be chosen based on its attributes. This begged the question: Can a model do what a human can do in terms of selecting photos?
+
+# Primary Questions
 
 1. What distinguishes selected images from not_selected images?
 
 2. Can a machine learning model predict whether an image will be selected based on its attributes?
 
 
-## Data
+# Data
 
-The dataset consists of 573 images, split into selected and not_selected categories. The images were preprocessed (resized and normalized) before being used to train a CNN model in Keras. Below is the code used to load and preprocess the data for analysis:
+The dataset consists of about 900 images, split into selected and not_selected categories. The images were preprocessed (resized and normalized) before being used to train a CNN model in Keras and then ultimately loaded into a Strealit web app for ease of use. Below is the code used to scrape for images, resize the images, create a model, train the model, and then create the web app.
 
 
-# Scraping Selected Images
+## Scraping Selected Images
 
 Here the code is scraping the images from CNN, TIME, and AP for what would go into my "selected" phtoto category.
 
@@ -76,7 +81,7 @@ print("Image scraping completed!")
 
 
 
-# Scraping not selected images
+## Scraping not selected images
 
 For my not Selected images I chose to obtain photos from awkward family photos in order to have a set of photos that had not been selected by a commitee. One thing that was different for this scraping was the use of selenium. Awkward family photos usea Java execution so the normal scraping procedure did not work. Also there were many pages of photos to scropp through which selenium does well.
 
@@ -176,7 +181,7 @@ print("Image scraping completed! 500 images saved in:", IMAGE_DIR)
 ```
 
 
-# Checking the sizes of the Images
+## Checking the sizes of the Images
 
 Checking the sizes of the images was crucial in the resizing process to see how many photos needed to be resized.
 ```{python}
@@ -211,7 +216,7 @@ check_image_sizes()
 
 ```
 
-# Resizing Images
+## Resizing Images
 
 This is the code I used to resize the images to a uniform size. This makes for better implementation and reading inside my model. The images were saved in a new "resized_images" folder but still under seleted or not selected.
 ```{python}
@@ -257,7 +262,7 @@ print("All images resized and saved in:", NEW_PATH)
 
 ```
 
-# Creating and training the model
+## Creating and training the model
 
 In this code chunk, I created an image selection model using a CNN (Convolutional Neural Network) with Keras. I included a pretrained MobileNetV2 base for feature extraction and added custom fully connected layers to adapt the model to my dataset. The MobileNetV2 was necesarry as I did not have a ton of photos so it definitely helped to make the model more accurate.
 ```{python}
@@ -361,9 +366,9 @@ plt.legend()
 plt.show()
 ```
 
-# Checking the prediction level
+## Checking the prediction level
 
-I used the model and ran predictions on some test photos to check and see if the model was running efficiently. This is where I ran into most of my problems but ultimately tweaked y model enough for it to run efficiently.
+I used the model and ran predictions on some test photos to check and see if the model was running efficiently. This is where I ran into most of my problems but ultimately tweaked my model enough for it to run efficiently.
 ```{python}
 import tensorflow as tf
 import numpy as np
@@ -404,29 +409,39 @@ image_path = "/Users/mattgutierrez80/Desktop/funny4.jpeg"
 predict_image(image_path)
 ```
 
-# Streamlit app generation
+## Streamlit app generation
 
-I then used Streamlit to create a web app for my model for use of use to drop in pictures without the need for code. This was probably the coolest part of my project as I really felt that it had come together into something awesome that I had created.
+I then used Streamlit to create a web app for my model for use of use to drop in pictures without the need for code. I did some neat stuff like adding in a baloon effect when selected and added different sound effects that can be played if the image is selected or not. The sound effect only works if you hit a play button as I could not figure out how to make autoplay work. This was probably the coolest part of my project as I really felt that it had come together into something awesome that I had created.
 ```{python}
 import streamlit as st  
 import tensorflow as tf
 import numpy as np
 import cv2
+import os
+import time
 from PIL import Image
+from io import BytesIO
 
-# Loading the model
+# Getting the absolute path of the current directory
+BASE_DIR = os.path.abspath(os.path.dirname(__file__) if "__file__" in locals() else os.getcwd())
+
+# Constructing the correct model path
+MODEL_PATH = os.path.join(BASE_DIR, "image_selection_model.keras")
+
+# Loading my trained model with caching
 @st.cache_resource
 def load_model():
-    try:
-        model = tf.keras.models.load_model("/Users/mattgutierrez80/image_selection_model.keras")
-        return model
-    except Exception as e:
-        st.error(f" Error loading model: {e}")
-        return None
+    with st.spinner("🔄 Loading Model... Please Wait."):
+        try:
+            model = tf.keras.models.load_model(MODEL_PATH)
+            return model
+        except Exception as e:
+            st.error(f"❌ Error loading model: {e}")
+            return None
 
 model = load_model()
 
-
+# Image size & class labels
 IMG_SIZE = (224, 224)
 CATEGORIES = ["not_selected", "selected"]
 
@@ -435,7 +450,7 @@ def predict_image(image):
     img = np.array(image)
     img = cv2.resize(img, IMG_SIZE)
     img = img / 255.0  
-    img = np.expand_dims(img, axis=0)
+    img = np.expand_dims(img, axis=0) 
 
     prediction = model.predict(img)
     class_index = np.argmax(prediction)
@@ -443,31 +458,85 @@ def predict_image(image):
 
     return CATEGORIES[class_index], confidence
 
-# Making the app
-st.title("📷 Image Selection Classifier")
-st.write("Upload an image and the model will classify it as **selected** or **not_selected**.")
+def play_sound(label):
+    """Play different sound effects based on selection result."""
+    selected_audio = "/Users/mattgutierrez80/Downloads/yippee.mp3"  
+    not_selected_audio = "/Users/mattgutierrez80/Downloads/fart.mp3"  
 
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
+    # Choose the correct audio file
+    audio_file = selected_audio if label == "selected" else not_selected_audio
+
+    if os.path.exists(audio_file):
+        with open(audio_file, "rb") as file:
+            audio_bytes = BytesIO(file.read()) 
+            st.audio(audio_bytes, format="audio/mp3")  
+            st.markdown("🔊 **Click play to hear the sound!**")
+    else:
+        st.error(f"⚠️ Sound file not found: {audio_file}")
+
+# Custom Styling
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #1e1e1e;
+        color: white;
+        font-family: 'Arial', sans-serif;
+    }
+    .stTitle {
+        font-size: 40px;
+        font-weight: bold;
+        text-align: center;
+        color: #FFD700;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Layout
+st.title("📷 Photo of The Year?")
+st.write(
+    "Upload an image and the model will classify it as **selected** or **not selected** for a "
+    "photo of the year catalog. This model was trained on images from CNN, AP, and TIME. **Will your image make the cut?**"
+)
+
+# File Upload
+uploaded_file = st.file_uploader("📂 Upload an Image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
-    # Displaying Uploaded Image
+    # Display Uploaded Image
     image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image", use_column_width=True)
+    st.image(image, caption="📷 Uploaded Image", use_column_width=True)
 
-    # Making the Prediction
+    # Make Prediction
     if st.button("🔍 Predict"):
-        label, confidence = predict_image(image)
-        st.success(f"**Prediction:** {label} 🎯 (Confidence: {confidence:.2f})")
+        with st.spinner("Analyzing image... 🔍"):
+            time.sleep(2) 
+            label, confidence = predict_image(image)
 
+        # Display Result
+        if label == "selected":
+            st.balloons()
+            st.success(f"🏆 **Your image made the cut!** 🎯 (Confidence: {confidence:.2f})")
+            play_sound(label) 
+        else:
+            st.warning(f"🚫 Not selected this time... Try another! ({confidence:.2f} confidence)")
+            play_sound(label) 
 ```
 
+# Results
 
-## Discussion
+I used 20 images to test my model on and it was able to detect most of them but still stuggled a but when it came to a bad image that was either a meme or just something that was obviously a joke as long as the image was high quality (not blurry or too pixelated) it categorized it as selected. This was still frustrating to me but I got the model to work with most pictures. I would say it categorized about 11 out of 20 photos correctly, which is just over 50%. This is not great but it is a start and I am happy with the results.
+
+I will say that my model was very certain a photo would be selected, as long as the photo was good quality (a well taken photo). That being said, without more photos it was really hard to get the model more accurate than it is now, and that is file. 
+
+# Discussion
  
 Looking at the AI’s photo selections compared to what a human would pick, I was surprised by how often they lined up. I expected AI to struggle with the more subtle, artistic choices. While it did in fact stuggle at some points and is still not very accurate, it actually did a solid job.  
 
-I went into this thinking human judgment would be way better, but my model definitely held its own. That said, the differences reminded me why humans are still needed. AI can recognize patterns, but it doesn’t have intuition or a creative eye. It can’t fully understand why some images just feel right, which is something that we as humaans have mastered.  
+I went into this thinking human judgment would be way better, and while it still is, my model definitely held its own. That said, the differences reminded me why humans are still needed. AI can recognize patterns, but it doesn’t have intuition or a creative eye. It can’t fully understand why some images just feel right, which is something that we as humans have mastered.  
 
-Overall, AI can be a helpful tool for narrowing down choices, but it’s not replacing human decision-making anytime soon. For photographers, editors, and content creators, it’s less about letting AI take over and more about using it to save time while keeping control over the final picks.
+Overall, AI can be a helpful tool for narrowing down choices, but it’s not replacing human decision-making anytime soon. For photographers, editors, and content creators, it’s less about letting AI take over and more about using it to save time while keeping control over the final picks. 
 
 This project really did test me and I am really glad to have had the opportunity to create something I find really awesome. The model I created was so much more than I could have ever thought and while it is no where near perfect, I am proud that I made this.

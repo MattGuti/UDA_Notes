@@ -88,7 +88,7 @@ history = model.fit(datagen.flow(X_train, y_train, batch_size=32),
                     epochs=25)  # ✅ Increased epochs
 
 # ✅ Save the model
-model.save("/Users/mattgutierrez80/Desktop/UDA_Notes/image_selection_model.keras")
+model.save("/Users/mattgutierrez80/image_selection_model.keras")
 print("✅ Model saved as image_selection_model.keras")
 
 # ✅ Plot accuracy
