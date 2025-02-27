@@ -1,0 +1,582 @@
+---
+title: "Homework 1"
+author: "Matt Gutierrez"
+format:
+  html:
+    toc: true
+    toc-location: left
+    self-contained: true
+jupyter: python3
+---
+
+Professional wrestling, while not everyone's cup of tea, is big business. What started as a carnival act has turned into a global entertainment industry. Netflix recently started showing Monday Night Raw, a program from the biggest North American wrestling company, WWE -- this deal is reportedly worth \$5 billion. Like any large entity, WWE is not without competition, drama, and scandal. 
+
+## General Tips
+
+This is very much a step-by-step process. Don't go crazy trying to get everything done with as few lines as possible. Read the documentation for the AlphaVantage api! Carefully explore the pages from cagematch. There isn't a need to get too fancy with anything here -- just go with simple function and all should be good. Don't print comments, but use normal text for explanations.
+
+## Step 1
+
+In the `calls` folder, you'll find 4 text files -- these are transcripts from quarterly earnings calls. Read those files in (glob.glob will be very helpful here), with appropriate column names for ticker, quarter, and year columns; this should be done within a single function. Perform any data cleaning that you find necessary. 
+
+```{python}
+import glob as glob
+import pandas as pd
+import re
+
+# Defining a function to read earnings calls from text files
+
+def read_earnings_calls(folder_path):
+  file_path = glob.glob(folder_path)
+
+  data_frames = []
+
+  pattern = re.compile(r'(\w+)_q(\d)_(\d{4})')
+
+# Looping through each file in the folder
+  for file in file_path:
+   match = pattern.search(file)
+   if match:
+    ticker, quarter, year = match.groups()
+
+
+    df = pd.read_csv(file, sep = '\t', header = None)
+
+    df['ticker'] = ticker
+    df['quarter'] = quarter
+    df['year'] = year
+
+    data_frames.append(df)
+  combined_df = pd.concat(data_frames, ignore_index = True)
+  return combined_df
+
+folder_path = "/Users/mattgutierrez80/Downloads/calls/*.txt"
+
+ # Reading earnings calls from text files 
+earnings_calls_df = read_earnings_calls(folder_path)
+print(earnings_calls_df.head())
+print(earnings_calls_df.tail())
+
+```
+
+## Step 2
+
+Use the AlphaVantage api to get daily stock prices for WWE and related tickers for the last 5 years -- pay attention to your data. You cannot use any AlphaVantage packages (i.e., you can only use requests to grab the data). Tell me about the general trend that you are seeing. I don't care which viz package you use, but plotly is solid and plotnine is good for ggplot2 users.
+
+```{python}
+
+# Plotting WWE stock prices over the last 5 years
+
+import requests
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Fetching data for WWE stock
+
+url = 'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=WWE&outputsize=full&apikey=V3ERKGM66R6OWLB7'
+
+r = requests.get(url)
+data = r.json()
+print(data)
+
+# Extracting the time series data
+
+time_series = data['Time Series (Daily)']
+
+# Converting the data to a pandas DataFrame
+
+df = pd.DataFrame.from_dict(time_series, orient = 'index')
+
+df.index = pd.to_datetime(df.index)
+
+df = df.apply(pd.to_numeric)
+
+df = df[df.index >= pd.Timestamp.now() - pd.DateOffset(years = 5)]
+
+# Plotting the closing price of WWE stock over the last 5 years
+
+plt.figure(figsize = (10, 5))
+plt.plot(df.index, df['4. close'], label = 'WWE Closing Price')
+plt.xlabel('Date')
+plt.ylabel('Closing Price USD')
+plt.title('WWE Daily Closing Price Over the Last 5 Years')
+plt.legend()
+plt.grid(True)
+plt.show()
+```
+
+```{python}
+# Plotting TKO stock prices over the last 5 years
+
+import requests
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Fetching data for TKO stock
+
+url = 'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=TKO&outputsize=full&apikey=Q58BZXZ0QZXDOW75'
+
+# Requesting data from the AlphaVantage API
+
+r = requests.get(url)
+data = r.json()
+print(data)
+
+# Extracting the time series data
+
+time_series = data['Time Series (Daily)']
+
+df = pd.DataFrame.from_dict(time_series, orient = 'index')
+
+df.index = pd.to_datetime(df.index)
+
+df = df.apply(pd.to_numeric)
+
+df = df[df.index >= pd.Timestamp.now() - pd.DateOffset(years = 5)]
+
+# Plotting the closing price of TKO stock over the last 5 years
+
+plt.figure(figsize = (10, 5))
+plt.plot(df.index, df['4. close'], label = 'TKO Closing Price')
+plt.xlabel('Date')
+plt.ylabel('Closing Price USD')
+plt.title('TKO Daily Closing Price Over the Last 5 Years')
+plt.legend()
+plt.grid(True)
+plt.show()
+```
+
+```{python}
+# Plotting WWE and TKO stock prices on the same chart
+
+import requests
+import matplotlib.pyplot as plt
+import pandas as pd
+
+def fetch_stock_data(symbol):
+    url = f'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=full&apikey=Q58BZXZ0QZXDOW75'
+    r = requests.get(url)
+    data = r.json()
+    
+    time_series = data['Time Series (Daily)']
+    df = pd.DataFrame.from_dict(time_series, orient='index')
+    df.index = pd.to_datetime(df.index)
+    df = df.apply(pd.to_numeric)
+    df = df[df.index >= pd.Timestamp.now() - pd.DateOffset(years=5)]
+    
+    return df[['4. close']].rename(columns={'4. close': symbol})
+
+# Fetching data for WWE and TKO
+wwe_data = fetch_stock_data('WWE')
+tko_data = fetch_stock_data('TKO')
+
+# Merging data on date index
+merged_df = wwe_data.join(tko_data, how='outer')
+
+# Plotting both stock prices on the same chart
+plt.figure(figsize=(12, 6))
+plt.plot(merged_df.index, merged_df['WWE'], label='WWE Closing Price', color='blue')
+plt.plot(merged_df.index, merged_df['TKO'], label='TKO Closing Price', color='red')
+
+plt.xlabel('Date')
+plt.ylabel('Closing Price (USD)')
+plt.title('WWE vs. TKO Daily Closing Prices Over the Last 5 Years')
+plt.legend()
+plt.grid(True)
+plt.show()
+```
+
+
+```{python}
+# Plotting EDR stock prices over the last 5 years
+
+import requests
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Fetching data for EDR stock
+
+url = 'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=EDR&outputsize=full&apikey=Q58BZXZ0QZXDOW75'
+
+# Requesting data from the AlphaVantage API
+
+r = requests.get(url)
+data = r.json()
+print(data)
+
+# Extracting the time series data
+
+time_series = data['Time Series (Daily)']
+
+df = pd.DataFrame.from_dict(time_series, orient = 'index')
+
+df.index = pd.to_datetime(df.index)
+
+df = df.apply(pd.to_numeric)
+
+df = df[df.index >= pd.Timestamp.now() - pd.DateOffset(years = 5)]
+
+# Plotting the closing price of EDR stock over the last 5 years
+
+plt.figure(figsize = (10, 5))
+plt.plot(df.index, df['4. close'], label = 'EDR Closing Price')
+plt.xlabel('Date')
+plt.ylabel('Closing Price USD')
+plt.title('EDR Daily Closing Price Over the Last 5 Years')
+plt.legend()
+plt.grid(True)
+plt.show()
+```
+
+
+
+
+## Step 3
+
+Just like every other nerdy hobby, professional wrestling draws dedicated fans. Wrestling fans often go to cagematch.net to leave reviews for matches, shows, and wrestlers. The following link contains the top 100 matches on cagematch: https://www.cagematch.net/?id=111&view=statistics
+
+* What is the correlation between WON ratings and cagematch ratings?
+
+** Which wrestler has the most matches in the top 100?
+
+*** Which promotion has the most matches in the top 100? 
+
+**** What is each promotion's average WON rating?
+
+***** Select any single match and get the comments and ratings for that match into a data frame.
+
+```{python}
+from bs4 import BeautifulSoup
+import numpy as np
+import pandas as pd
+import re
+import requests
+import time
+
+# Fetching the top 100 matches from cagematch.net
+
+link = "https://www.cagematch.net/?id=111&view=statistics"
+
+top_100_matches_req = requests.get(link)
+
+top_100_matches_soup = BeautifulSoup(top_100_matches_req.content, "html.parser")
+print(top_100_matches_soup)
+
+# Extracting the column names from the table
+
+columns = top_100_matches_soup.select('tr')[0].text
+
+column_names = re.findall(r'WON|[#A-Z][a-z]*', columns)
+print(column_names)
+
+column_names.remove('Type')
+column_names[3] = 'Match Fixture'
+column_names[5] = 'Match Type'
+print(column_names)
+
+top_100_matches_df = pd.DataFrame(columns=column_names)
+
+top_100_matches_df
+
+rows = top_100_matches_soup.select('tr', class_ = 'TCol')[1:]
+rows
+
+# Extracting the data from the rows
+
+for row in rows[0:]:
+    row_data = row.find_all('td')
+    individual_row_data  = [data.text.strip() for data in row_data]
+    print(individual_row_data)
+    length = len(top_100_matches_df)
+    top_100_matches_df.loc[length] = individual_row_data
+
+top_100_matches_df
+
+for index, row in enumerate(rows):
+    row_data = row.find_all('td')
+    promotion_title = None
+    for data in row_data:
+      img = data.find('img',class_='ImagePromotionLogo_mini')
+      if img and 'title' in img.attrs:
+        promotion_title = img['title']
+        break
+    top_100_matches_df.at[index, 'Promotion'] = promotion_title
+
+# Cleaning the data
+
+def convert_star_rating(rating):
+
+    stars = rating.count('*')
+    
+    if '1/2' in rating:
+        return stars + 0.5
+    elif '1/4' in rating:
+        return stars + 0.25
+    elif '3/4' in rating:
+        return stars + 0.75
+    else:
+        return stars
+
+top_100_matches_df['WON'] = top_100_matches_df['WON'].apply(convert_star_rating)
+
+# Answering the questions
+
+# Question 1
+cor_100 = top_100_matches_df['Rating'].corr(top_100_matches_df['WON'])
+print(cor_100)
+# Answer : 0.21
+
+
+# Question 2
+print(top_100_matches_df.columns)
+
+print(top_100_matches_df['Match Fixture'].head())
+
+split1 = top_100_matches_df['Match Fixture'].str.split('vs.', expand=True)
+print(split1.head())  
+
+split2 = split1.stack().str.split('&', expand=True)
+print(split2.head())  
+
+indiv_wrestler = top_100_matches_df['Match Fixture'].str.split('vs.', expand=True).stack()
+indiv_wrestler = indiv_wrestler.str.split('&', expand=True).stack()
+
+indiv_wrestler_df = pd.DataFrame(indiv_wrestler, columns=['Wrestler'])
+
+indiv_wrestler_df['Wrestler'] = indiv_wrestler_df['Wrestler'].str.strip()
+
+most_matches = indiv_wrestler_df['Wrestler'].value_counts()
+
+print(most_matches)
+# Answer: Kenny Omega
+
+
+
+# Question 3
+promotion_counts = top_100_matches_df['Promotion'].value_counts()
+print(promotion_counts)
+# Answer: NJPW
+
+
+
+#Question 4
+avg_won_ratings = top_100_matches_df.groupby('Promotion')['WON'].mean()
+print(avg_won_ratings)
+#Answer: 
+# All Elite Wrestling                     5.56250
+# All Japan Pro Wrestling                 4.979167
+# All Japan Women's Pro-Wrestling         3.687500
+# DDT Pro Wrestling                       0.000000
+# GAEA Japan                              0.000000
+# JTO                                     4.750000
+# Japanese Women Pro-Wrestling Project    5.000000
+# Lucha Underground                       0.000000
+# New Japan Pro Wrestling                 5.382353
+# Pro Wrestling NOAH                      4.785714
+# Ring Of Honor                           4.312500
+# Total Nonstop Action Wrestling          5.000000
+# World Championship Wrestling            5.000000
+# World Wonder Ring Stardom               2.750000
+# World Wrestling Entertainment           4.892857
+
+
+
+
+#Question 5
+
+# Selecting a single match to get the comments and ratings (Kenny Omega vs. Will Ospreay)
+match_link = "https://www.cagematch.net/?id=111&nr=75183&page=99"
+
+# Fetching the comments and ratings for the match
+match_req = requests.get(match_link)
+match_soup = BeautifulSoup(match_req.content, "html.parser")
+
+# Extracting the comments and ratings
+comments_section = match_soup.select('.Comment') 
+
+# Creating a DataFrame to store the comments and ratings
+comment_data = []
+for comment in comments_section:
+    user = comment.select_one(".CommentHeader")  
+    rating = comment.select_one(".Rating") 
+    text = comment.select_one(".CommentContents")  
+    
+    rating = rating.text.strip() if rating else "No Rating"
+    text = text.text.strip() if text else "No Comment"
+    
+    comment_data.append([user, rating, text])
+
+comment_df = pd.DataFrame(comment_data, columns=["User/Date", "Rating", "Comment"])
+
+# Displaying the comments and ratings
+print(comment_df)
+
+#Answer:comment_df
+
+
+
+```
+
+## Step 4
+
+You can't have matches without wrestlers. The following link contains the top 100 wrestlers, according to cagematch: https://www.cagematch.net/?id=2&view=statistics
+
+*** Of the top 100, who has wrestled the most matches?
+
+***** Of the top 100, which wrestler has the best win/loss?
+
+```{python}
+
+# Fetching the top 100 wrestlers from cagematch.net
+
+link = "https://www.cagematch.net/?id=2&view=statistics"
+
+top_100_wrest_req = requests.get(link)
+
+top_100_wrest_soup = BeautifulSoup(top_100_wrest_req.content, "html.parser")
+print(top_100_wrest_soup)
+
+top_100_wrest_soup.select('td')
+
+top_100_wrest_soup.find_all('a')
+
+nested_urls = [a['href'] for a in top_100_wrest_soup.find_all('a', href=True) if 'gimmick' in a['href']]
+
+nested_urls = nested_urls[2:]
+
+#Hiroyuki Unno doesnt have match statistics
+
+base_url = "https://www.cagematch.net/"
+
+
+stored_data = []
+
+for relative_url in nested_urls:
+    full_url = base_url + relative_url
+    print(full_url)
+    stored_data.append(full_url)
+
+soups = []
+
+for url in stored_data[0:]:
+  match_stats_req = requests.get(url)
+  match_stats_soup = BeautifulSoup(match_stats_req.content, "html.parser")
+  if match_stats_soup:
+    soups.append(match_stats_soup)
+
+final_urls = []
+
+
+
+for soup in soups[0:]:
+  li_tags = soup.find_all('li', class_='ContentNavigatorItem')
+  for li in li_tags:
+    a_tag = li.find('a', href=True)
+    if a_tag and 'Match Statistics' in a_tag.text:
+      new_url = a_tag['href']
+      final_urls.append(base_url + new_url)
+
+
+print(final_urls)
+
+
+final_soup = []
+
+for url in final_urls[0:]:
+  career_stats_req = requests.get(url)
+  career_stats_soup = BeautifulSoup(career_stats_req.content, "html.parser")
+  if career_stats_soup: 
+    final_soup.append(career_stats_soup)
+
+totals_columns = []
+
+totals = career_stats_soup.find_all('div', class_='InformationBoxTitle')
+
+for total in totals:
+  text = total.text.strip()
+  totals_columns.append(text)
+
+match_stats_df = pd.DataFrame(columns=totals_columns)
+
+match_stats_df.insert(2, 'Win Percentage', True)
+match_stats_df.insert(4, 'Loss Percentage', True)
+match_stats_df.insert(6, 'Draw Percentage', True)
+
+full_match_stats = []
+
+pattern = r'\d+\.\d+%?|\d+%?'
+
+for soup in final_soup:
+  numeric_totals = soup.find_all('div', class_='InformationBoxContents')
+  for numeric_total in numeric_totals:
+    text = numeric_total.text.strip()
+    full_stats = re.findall(pattern, text)
+    full_match_stats.append(full_stats)
+
+filtered_full_match_stats = [item for sublist in full_match_stats for item in sublist]
+
+full_match_stats_rows = [filtered_full_match_stats[i:i + 7] for i in range(0, len(filtered_full_match_stats), 7)]
+
+for row in full_match_stats_rows:
+  length = len(match_stats_df)
+  match_stats_df.loc[length] = row
+
+
+match_stats_df.insert(0, 'Wrestler', True)
+
+match_stats_df
+
+names_complete = []
+
+for url in final_urls[0:]:
+  names_req = requests.get(url)
+  names_soup = BeautifulSoup(names_req.content, "html.parser")
+  full_name = names_soup.find_all('h1', class_='TextHeader')
+  for name in full_name:
+    name = name.text.strip()
+    names_complete.append(name)
+
+match_stats_df['Wrestler'] = names_complete
+
+match_stats_df
+
+cols_to_convert = ['Total number of matches:',  'Total number of wins:', 'Total number of losses:', 
+  'Total number of draws:']
+match_stats_df[cols_to_convert] = match_stats_df[cols_to_convert].apply(pd.to_numeric, errors='coerce')
+
+
+
+# Of the top 100, who has wrestled the most matches?
+most_matches = match_stats_df.loc[match_stats_df['Total number of matches:'].idxmax()]
+print(most_matches)
+# Answer: Ric Flair
+
+
+
+
+# Of the top 100, which wrestler has the best win/loss?
+win_loss_ratio = match_stats_df['Total number of wins:'] / match_stats_df['Total number of matches:']
+
+best_win_pct = match_stats_df.loc[win_loss_ratio.idxmax()]
+
+print(best_win_pct)
+# Answer: Gene Okerlund (Although he only wrestled 4 matches, he won all of them)
+
+```
+
+## Step 5
+
+With all of this work out of the way, we can start getting down to strategy.
+
+First, what talent should WWE pursue? Advise carefully. 
+
+Based on the analysis of the top 100 wrestlers and matches on Cagematch.net, WWE could benefit from pursuing talent like Kenny Omega, who has the most matches in the top 100 and is widely regarded as a superstar. Additionally, WWE should consider targeting free agents from New Japan Pro Wrestling (NJPW), as the promotion has the highest number of matches in the top 100, demonstrating its ability to produce top-tier talent. Keeping an eye on free agents from All Elite Wrestling (AEW) would also be a strategic move, given that AEW boasts the highest average Wrestling Observer Newsletter (WON) rating among major promotions, indicating a roster filled with high-caliber performers. By actively scouting talent from these promotions, WWE could strengthen its roster with some of the best wrestlers in the industry.
+
+Second, reconcile what you found in steps 3 and 4 with Netflix's relationship with WWE. Use the data from the following page to help make your case: https://wrestlenomics.com/tv-ratings/  
+
+The website data suggests that WWE’s television ratings have declined over the years, likely due to factors such as the rise of streaming services, shifting viewership habits, and the overall quality of the product. Despite this, WWE remains a dominant force in the wrestling industry with a loyal fanbase. Its partnership with Netflix presents a strategic opportunity for both sides. WWE can expand its audience by leveraging Netflix’s platform, while Netflix can tap into WWE’s extensive fanbase by offering exclusive content and strengthening its presence in the sports entertainment genre. Ultimately, this collaboration has the potential to be mutually beneficial.
+
+
+Third, do you have any further recommendations for WWE?
+
+WWE should prioritize enhancing the quality of its programming to attract and retain viewers. This can be achieved by investing in stronger storylines, deeper character development, and high-caliber in-ring action. Expanding its reach through strategic partnerships (like Netflix) with other platforms and promotions (such as NJPW) could also help WWE engage new audiences. Additionally, continued investment in talent development and scouting will ensure a strong, dynamic roster. By focusing on these key areas, WWE can sustain its growth and solidify its position as a dominant force in the wrestling industry.

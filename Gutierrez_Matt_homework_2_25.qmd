@@ -1,0 +1,192 @@
+---
+title: "Homework 2"
+author: "Matthew Gutierrez"
+format:
+  html:
+    toc: true
+    toc-location: left
+    self-contained: true
+jupyter: python3
+---
+
+## Task 1
+
+We are going to return to the table of the top 100 wrestlers: https://www.cagematch.net/?id=2&view=statistics. Specifically, you are going to get the ratings/comments tables for each wrestler.
+
+```{python}
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+
+base_url = "https://www.cagematch.net/"
+wrest_link = base_url + "?id=2&view=statistics"
+
+# Fetching the main wrestlers' statistics page
+wrest_req = requests.get(wrest_link)
+wrest_soup = BeautifulSoup(wrest_req.content, "html.parser")
+
+# Extracting URLs for each wrestler's profile page
+wrestler_urls = [base_url + a['href'] for a in wrest_soup.find_all('a', href=True) if 'gimmick' in a['href']]
+
+# Extracting the ratings/comments page for each wrestler
+comments_pages = []
+for url in wrestler_urls:
+    wrest_p_req = requests.get(url)
+    wrest_p_soup = BeautifulSoup(wrest_p_req.content, "html.parser")
+    
+    # Finding the 'Comments' page link
+    comment_link_tag = wrest_p_soup.find('li', class_='ContentNavigatorItem', text=lambda x: x and 'Comments' in x)
+    
+    if comment_link_tag:
+        comment_link = comment_link_tag.find('a', href=True)
+        if comment_link:
+            comments_pages.append(base_url + comment_link['href'])
+
+# Scraping comments from each wrestler's comment page
+reviews_data = []
+for url in comments_pages:
+    comment_req = requests.get(url)
+    comment_soup = BeautifulSoup(comment_req.content, "html.parser")
+
+    comments = comment_soup.find_all('div', class_='Comment')
+    for comment in comments:
+        user = comment.select_one(".CommentHeader").text.strip() if comment.select_one(".CommentHeader") else "Unknown"
+        rating = comment.select_one("span.Rating").text.strip() if comment.select_one("span.Rating") else "No Rating"
+        text = comment.select_one(".CommentContents").text.strip() if comment.select_one(".CommentContents") else "No Comment"
+        
+        reviews_data.append([user, rating, text])
+
+# Storing data in a Pandas DataFrame
+reviews_df = pd.DataFrame(reviews_data, columns=["User/Date", "Rating", "Comment"])
+
+# Displaying tha dataframe
+
+reviews_df
+
+```
+
+
+## Task 2
+
+Perform any form of sentiment analysis. What is the relationship between a reviewer's sentiment and their rating?
+```{python}
+import pandas as pd
+import re
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
+from textblob import TextBlob
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import MinMaxScaler
+from langdetect import detect, DetectorFactory
+
+DetectorFactory.seed = 42
+
+nltk.download('vader_lexicon')
+
+sia = SentimentIntensityAnalyzer()
+
+def is_english(text):
+    try:
+        return detect(text) == 'en'
+    except:
+        return False
+
+# Removing German and other non-English comments
+reviews_df = reviews_df[reviews_df['Comment'].astype(str).apply(is_english)]
+
+def get_sentiment(text):
+    vader_score = sia.polarity_scores(text)['compound']
+    textblob_score = TextBlob(text).sentiment.polarity
+    return (vader_score + textblob_score) / 2
+
+# Applying sentiment function to comments
+reviews_df['Sentiment Score'] = reviews_df['Comment'].astype(str).apply(get_sentiment)
+
+# Converting ratings to numeric
+reviews_df['Rating'] = pd.to_numeric(reviews_df['Rating'], errors='coerce')
+
+# Normalizing ratings 
+scaler = MinMaxScaler(feature_range=(0, 10))
+reviews_df['Normalized Rating'] = scaler.fit_transform(reviews_df[['Rating']])
+
+# Removing NaN values
+reviews_df = reviews_df.dropna(subset=['Normalized Rating'])
+
+# Performing Linear Regression
+X = reviews_df[['Sentiment Score']]
+y = reviews_df['Normalized Rating']
+
+model = LinearRegression()
+model.fit(X, y)
+predictions = model.predict(X)
+
+# Visualizing the relationship
+plt.figure(figsize=(10, 6))
+sns.regplot(x=reviews_df['Sentiment Score'], y=reviews_df['Normalized Rating'], scatter_kws={'alpha':0.5}, line_kws={"color": "red"})
+plt.xlabel("Sentiment Score (VADER + TextBlob)")
+plt.ylabel("Normalized Rating")
+plt.title("Relationship Between Sentiment and Rating")
+plt.show()
+
+# Calculating correlation
+correlation = reviews_df[['Sentiment Score', 'Normalized Rating']].corr()
+
+correlation
+```
+
+
+The Sentiment Score and Normalized Rating have a correlation of 0.3275, indicating a weak to moderate positive relationship. This means that higher sentiment generally corresponds with higher ratings, but the impact is relatively small based on the correlation coefficient. The scatter plot and regression line show a general trend of increasing ratings with higher sentiment scores, but there is a wide spread of ratings for similar sentiment scores. This suggests that sentiment is not the only factor that influences ratings, and other aspects such as a fans personal preferences, expectations, and experiences may play more of a role into how a fan decides to give their rating.
+
+
+## Task 3
+
+Perform any type of topic modeling on the comments. What are the main topics of the comments? How can you use those topics to understand what people value?
+
+```{python}
+import pandas as pd
+import re
+import nltk
+import matplotlib.pyplot as plt
+import seaborn as sns
+from nltk.corpus import stopwords
+from bertopic import BERTopic
+
+
+nltk.download('stopwords')
+stop_words = set(stopwords.words('english'))
+
+def preprocess_text(text):
+    """Clean text by removing special characters, converting to lowercase, and removing stopwords."""
+    text = re.sub(r'\W+', ' ', text).lower()
+    return ' '.join(word for word in text.split() if word not in stop_words)
+
+reviews_df['Cleaned_Comment'] = reviews_df['Comment'].astype(str).apply(preprocess_text)
+
+# Fitting the BERTopic model
+topic_model = BERTopic()
+topics, probs = topic_model.fit_transform(reviews_df['Cleaned_Comment'])
+
+# Assigning topics to DataFrame
+reviews_df['Topic'] = topics  
+
+# Get topic info
+topic_info = topic_model.get_topic_info()
+
+topics_dict = topic_model.get_topics()
+for topic_id, words in topics_dict.items():
+    print(f"Topic {topic_id}: {', '.join([word[0] for word in words])}")
+
+# Bar plot for top topics
+plt.figure(figsize=(12, 6))
+sns.barplot(x='Topic', y='Count', data=topic_info.head(10), palette='viridis')
+plt.xticks(rotation=45, ha="right")  # Rotate labels for readability
+plt.title("Top 10 Topics by Count")
+plt.xlabel("Topic")
+plt.ylabel("Count")
+plt.show()
+```
+
+Based on the topic modeling, we can see that the top 10 topics are related to different aspects of wrestling. General Praise & Discussion is the most common topic as it has over 3000 words used.I had initially tried to apply custom labels to each topic, but realized that with BERTopic the topic order is not consistent across runs. Therefore, I have provided the top 10 topics without custom labels. However, when looking at topics it becomes clear that each topic relates to a specific wrestler and things that make up their legacy, along with things such as mic skills, technical wrestling, and high-flying style. This information can be used to understand what people value in wrestling, such as the importance of charisma, technical skills, and the impact of legendary wrestlers on the sport.

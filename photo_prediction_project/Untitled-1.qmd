@@ -1,0 +1,157 @@
+---
+title: "Untitled"
+format: html
+---
+
+```{python}
+import os
+import random
+import requests
+import shutil
+import zipfile
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator, load_img, img_to_array
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.layers import Dense, Flatten, Dropout
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+import matplotlib.pyplot as plt
+
+# Set paths
+BASE_DIR = "photo_of_the_year_dataset"
+TRAIN_DIR = os.path.join(BASE_DIR, "train")
+VALID_DIR = os.path.join(BASE_DIR, "valid")
+TEST_DIR = os.path.join(BASE_DIR, "test")
+
+# URLs for "Photo of the Year" sources
+photo_links = {
+    "time": "https://time.com/7176286/top-100-photos-2024/",
+    "apnews": "https://apnews.com/associated-press-100-photos-of-2024-an-epic-catalog-of-humanity",
+    "natgeo": "https://www.nationalgeographic.com/photography/graphics/pictures-of-the-year-2024",
+    "worldpressphoto": "https://www.worldpressphoto.org/collection/photocontest/winners/2024",
+    "nypost": "https://nypost.com/2024/12/31/the-best-photos-of-2024/",
+    "atlantic": "https://www.theatlantic.com/photo/2024/12/top-25-news-photos-of-2024/1003081/",
+    "reuters": "https://www.reuters.com/investigates/special-report/year-end-2024-photos-best/"
+}
+
+# Function to create dataset directories
+def create_dirs():
+    for dir_path in [TRAIN_DIR, VALID_DIR, TEST_DIR]:
+        os.makedirs(os.path.join(dir_path, "award_winning"), exist_ok=True)
+        os.makedirs(os.path.join(dir_path, "non_award_winning"), exist_ok=True)
+
+# Download and organize sample images (Placeholder: You should manually add images)
+def download_sample_images():
+    print("Please manually add images to 'photo_of_the_year_dataset/train/'")
+
+# Prepare dataset
+create_dirs()
+download_sample_images()
+
+# Data Augmentation and Preprocessing
+train_datagen = ImageDataGenerator(
+    rescale=1./255,
+    rotation_range=30,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    validation_split=0.2
+)
+
+# Load Data
+train_generator = train_datagen.flow_from_directory(
+    TRAIN_DIR,
+    target_size=(224, 224),
+    batch_size=32,
+    class_mode='binary',
+    subset='training'
+)
+
+valid_generator = train_datagen.flow_from_directory(
+    TRAIN_DIR,
+    target_size=(224, 224),
+    batch_size=32,
+    class_mode='binary',
+    subset='validation'
+)
+
+# Load Pre-trained VGG16 Model
+base_model = VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+
+# Freeze layers in the base model
+for layer in base_model.layers:
+    layer.trainable = False
+
+# Add custom layers
+x = Flatten()(base_model.output)
+x = Dense(512, activation='relu')(x)
+x = Dropout(0.5)(x)
+x = Dense(1, activation='sigmoid')  # Binary classification
+
+# Create the final model
+model = Model(inputs=base_model.input, outputs=x)
+
+# Compile the model
+model.compile(optimizer=Adam(learning_rate=0.0001), loss='binary_crossentropy', metrics=['accuracy'])
+
+# Train the model
+history = model.fit(
+    train_generator,
+    steps_per_epoch=len(train_generator),
+    validation_data=valid_generator,
+    validation_steps=len(valid_generator),
+    epochs=10
+)
+
+# Save model
+model.save("photo_of_the_year_model.h5")
+
+# Plot Training Accuracy and Loss
+def plot_training_history(history):
+    plt.figure(figsize=(12, 4))
+    
+    # Accuracy plot
+    plt.subplot(1, 2, 1)
+    plt.plot(history.history['accuracy'], label='Train Accuracy')
+    plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+    plt.xlabel("Epochs")
+    plt.ylabel("Accuracy")
+    plt.legend()
+    plt.title("Training vs Validation Accuracy")
+    
+    # Loss plot
+    plt.subplot(1, 2, 2)
+    plt.plot(history.history['loss'], label='Train Loss')
+    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.title("Training vs Validation Loss")
+
+    plt.show()
+
+plot_training_history(history)
+
+# Prediction Function
+def predict_image(image_path):
+    img = load_img(image_path, target_size=(224, 224))
+    img_array = img_to_array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+    
+    prediction = model.predict(img_array)[0][0]
+    label = "Award-Winning" if prediction > 0.5 else "Not Award-Winning"
+    
+    print(f"Prediction: {label} ({prediction:.2f})")
+    return label
+
+# Test with an image
+test_image = "test_image.jpg"  # Replace with an actual image path
+if os.path.exists(test_image):
+    predict_image(test_image)
+else:
+    print("Please provide a test image to run predictions.")
+
+```
