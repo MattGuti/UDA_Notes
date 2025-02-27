@@ -78,7 +78,7 @@ st.markdown(
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    st.image("📷")  # Placeholder for a logo (Optional)
+    st.image("/Users/mattgutierrez80/Desktop/UDA_Notes/test_image.jpg", width=100)  
 
 with col2:
     st.title("📷 Photo of The Year?")
@@ -108,5 +108,4 @@ if uploaded_file is not None:
             st.success(f"🏆 **Your image made the cut!** 🎯 (Confidence: {confidence:.2f})")
         else:
             st.warning(f"🚫 Not selected this time... Try another! ({confidence:.2f} confidence)")
-
 
