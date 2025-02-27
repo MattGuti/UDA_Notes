@@ -4,17 +4,29 @@ import numpy as np
 import cv2
 from PIL import Image
 
-# Loading the model
+# Loading the trained model
+import os
+import streamlit as st
+import tensorflow as tf
+
+# ✅ Get the absolute path of the current directory (Works in Streamlit!)
+BASE_DIR = os.path.abspath(os.path.dirname(__file__) if "__file__" in locals() else os.getcwd())
+
+# ✅ Construct the correct model path
+MODEL_PATH = os.path.join(BASE_DIR, "image_selection_model.keras")
+
+# ✅ Load the trained model with caching
 @st.cache_resource
 def load_model():
     try:
-        model = tf.keras.models.load_model("/Users/mattgutierrez80/image_selection_model.keras")
+        model = tf.keras.models.load_model(MODEL_PATH)
         return model
     except Exception as e:
         st.error(f"❌ Error loading model: {e}")
         return None
 
 model = load_model()
+
 
 
 IMG_SIZE = (224, 224)
