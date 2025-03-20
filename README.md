@@ -1,0 +1,1 @@
+This is a concise deomstartion of the code used to build an image selection app for a photo of the year album. I created this using a CNN model and trained it using various pictures from AP News, CNN, and TIME Magazines. The model runs at about 86% accuracy and is very fun to play with!
